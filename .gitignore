@@ -209,3 +209,4 @@ __marimo__/
 # Other
 data/
 .DS_Store
+optuna.db
