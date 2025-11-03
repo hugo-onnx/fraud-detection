@@ -1,0 +1,60 @@
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.joblib
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# Data folders
+data/raw/
+data/processed/
+results/
+!data/processed/scaler.pkl
+!data/processed/feature_columns.json
+
+# Model training artifacts
+models/*.onnx
+models/*.pkl
+models/*.joblib
+models/*.bin
+!models/LightGBM_best.onnx
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+*.out
+
+# Version control
+.git/
+.gitignore
+.gitattributes
+
+# Build / cache / misc
+__pycache__/
+*.egg-info/
+dist/
+build/
+.DS_Store
+
+# Local development tools
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# uv-related cache
+.uv/
+uv.lock.bak
+
+# Other
+commands.txt
