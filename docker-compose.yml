@@ -9,7 +9,6 @@ services:
     ports:
       - "8080:8080"
     restart: unless-stopped
-    # Optional volume mounts for local development:
-    # volumes:
-    #   - ./models:/app/models
-    #   - ./data:/app/data
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
