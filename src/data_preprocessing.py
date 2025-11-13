@@ -45,9 +45,20 @@ def scale_and_save(X_train, X_test, y_train, y_test, out_dir="data/processed"):
     )
     return X_train_scaled, X_test_scaled, scaler
 
+def create_production_copy(df, out_dir="data/production"):
+    os.makedirs(out_dir, exist_ok=True)
+
+    df_copy = df.copy()
+    if "Class" in df_copy.columns:
+        df_copy = df_copy.rename(columns={"Class": "fraud_probability"})
+
+    output_path = os.path.join(out_dir, "creditcard_reference.csv")
+    df_copy.to_csv(output_path, index=False)
+
 
 if __name__ == "__main__":
     df = load_raw()
     X_train, X_test, y_train, y_test = prepare_and_split(df)
     X_train_scaled, X_test_scaled, scaler = scale_and_save(X_train, X_test, y_train, y_test)
+    create_production_copy(df)
     print("Data prep done")
