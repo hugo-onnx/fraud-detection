@@ -51,4 +51,4 @@ build/
 uv.lock.bak
 
 # Other
-commands.txt
+*.txt

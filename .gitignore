@@ -136,6 +136,7 @@ celerybeat.pid
 
 # Environments
 .env
+.env.local
 .envrc
 .venv
 env/
@@ -210,5 +211,5 @@ __marimo__/
 data/
 .DS_Store
 optuna.db
-commands.txt
+*.txt
 scripts/
