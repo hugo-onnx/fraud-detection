@@ -13,8 +13,9 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, model_validator
 from evidently import Dataset, DataDefinition, Report, BinaryClassification
 from evidently.presets import DataDriftPreset, DataSummaryPreset
-from typing import Dict, Any, Optional
 
+import mlflow
+from mlflow.tracking import MlflowClient
 
 logging.basicConfig(
     level=logging.INFO,
@@ -24,12 +25,86 @@ logger = logging.getLogger("fraud-api")
 
 app = FastAPI(title="Fraud Detection API")
 
-onnx_model_path = "models/LightGBM_best.onnx"
-scaler = joblib.load("data/processed/scaler.pkl")
-with open("data/processed/feature_columns.json", "r") as f:
-    cols = json.load(f)
+MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
+mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
+logger.info(f"MLflow tracking URI: {MLFLOW_TRACKING_URI}")
 
-session = rt.InferenceSession(onnx_model_path, providers=["CPUExecutionProvider"])
+MLFLOW_REGISTRY_URI = os.getenv("MLFLOW_REGISTRY_URI", "http://mlflow:5000")
+mlflow.set_registry_uri(MLFLOW_REGISTRY_URI)
+logger.info(f"MLflow registry URI: {MLFLOW_REGISTRY_URI}")
+
+client = MlflowClient()
+
+# Model names in registry
+MODEL_NAMES = {
+    "lightgbm": "fraud_detection_lightgbm",
+    "randomforest": "fraud_detection_randomforest",
+    "logisticregression": "fraud_detection_logisticregression"
+}
+
+def find_champion_model():
+    for model_key, model_name in MODEL_NAMES.items():
+        try:
+            model_version = client.get_model_version_by_alias(model_name, "champion")
+            logger.info(f"Found champion model: {model_name} (version {model_version.version})")
+            return model_name, model_version
+        except Exception:
+            continue
+    
+    raise ValueError(
+        "No model with 'champion' alias found in registry. "
+        "Please run the training pipeline to register and promote a champion model."
+    )
+
+def load_model_from_registry():
+    try:
+        model_name, model_version = find_champion_model()
+        model_uri = f"models:/{model_name}@champion"
+        
+        logger.info(f"Loading champion model: {model_uri}")
+        logger.info(f"Model version: {model_version.version}")
+        logger.info(f"Description: {model_version.description}")
+        
+        artifact_path = f"runs:/{model_version.run_id}"
+        
+        model_type = None
+        for key in MODEL_NAMES.keys():
+            if key in model_name.lower():
+                model_type = key.title().replace("forest", "Forest")
+                if "lightgbm" in key:
+                    model_type = "LightGBM"
+                elif "logisticregression" in key:
+                    model_type = "LogisticRegression"
+                elif "randomforest" in key:
+                    model_type = "RandomForest"
+                break
+        
+        if not model_type:
+            raise ValueError(f"Could not determine model type from {model_name}")
+        
+        onnx_artifact_path = f"{artifact_path}/{model_type}/onnx/{model_type}_best.onnx"
+        model_path = mlflow.artifacts.download_artifacts(onnx_artifact_path)
+        
+        session = rt.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        
+        scaler = joblib.load("data/processed/scaler.pkl")
+        
+        with open("data/processed/feature_columns.json", "r") as f:
+            cols = json.load(f)
+        
+        return session, scaler, cols, model_version.version, model_name, model_version.description
+    
+    except Exception as e:
+        logger.error(f"Failed to load model from MLflow: {str(e)}")
+        logger.warning("Falling back to local model files")
+        onnx_model_path = "models/LightGBM_best.onnx"
+        scaler = joblib.load("data/processed/scaler.pkl")
+        with open("data/processed/feature_columns.json", "r") as f:
+            cols = json.load(f)
+        session = rt.InferenceSession(onnx_model_path, providers=["CPUExecutionProvider"])
+        return session, scaler, cols, "local", "local_fallback", "Local fallback model"
+
+session, scaler, cols, model_version, model_name, model_description = load_model_from_registry()
 
 prob_output = None
 for out in session.get_outputs():
@@ -302,4 +377,116 @@ def get_drift_report_json():
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "model_name": model_name,
+        "model_version": model_version,
+        "model_description": model_description,
+    }
+
+
+@app.get("/model/info")
+def get_model_info():
+    """Get detailed information about the current champion model"""
+    try:
+        model_name_clean, model_version_obj = find_champion_model()
+        
+        return {
+            "model_name": model_name_clean,
+            "model_version": model_version_obj.version,
+            "description": model_version_obj.description,
+            "run_id": model_version_obj.run_id,
+            "status": model_version_obj.status,
+            "tags": model_version_obj.tags,
+            "creation_timestamp": model_version_obj.creation_timestamp,
+            "last_updated_timestamp": model_version_obj.last_updated_timestamp
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get model info: {str(e)}"
+        )
+
+
+@app.post("/model/reload")
+def reload_model():
+    """Reload the champion model from MLflow registry (useful when champion alias is updated)"""
+    global session, scaler, cols, model_version, model_name, model_description, output_name, input_name
+    
+    try:
+        logger.info("Reloading champion model from MLflow registry...")
+        session, scaler, cols, model_version, model_name, model_description = load_model_from_registry()
+        
+        prob_output = None
+        for out in session.get_outputs():
+            if "prob" in out.name.lower() or "probability" in out.name.lower():
+                prob_output = out.name
+                break
+        
+        output_name = prob_output if prob_output else session.get_outputs()[0].name
+        input_name = session.get_inputs()[0].name
+        
+        logger.info(f"Model reloaded successfully: {model_name} version {model_version}")
+        
+        return {
+            "status": "success",
+            "model_name": model_name,
+            "model_version": model_version,
+            "model_description": model_description,
+            "message": f"Champion model reloaded from MLflow registry"
+        }
+    
+    except Exception as e:
+        logger.exception(f"Error reloading model: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to reload model: {str(e)}"
+        )
+
+
+@app.get("/models/available")
+def list_available_models():
+    """List all registered models and their versions"""
+    try:
+        models_info = []
+        
+        for model_key, model_name_reg in MODEL_NAMES.items():
+            try:
+                versions = client.search_model_versions(f"name='{model_name_reg}'")
+                
+                model_data = {
+                    "model_name": model_name_reg,
+                    "versions": []
+                }
+                
+                for version in versions:
+                    version_info = {
+                        "version": version.version,
+                        "description": version.description,
+                        "status": version.status,
+                        "run_id": version.run_id,
+                        "aliases": version.aliases,
+                        "tags": version.tags,
+                        "is_champion": "champion" in version.aliases
+                    }
+                    model_data["versions"].append(version_info)
+                
+                models_info.append(model_data)
+                
+            except Exception as e:
+                logger.warning(f"Could not fetch info for {model_name_reg}: {e}")
+                continue
+        
+        return {
+            "models": models_info,
+            "current_champion": {
+                "model_name": model_name,
+                "version": model_version
+            }
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list models: {str(e)}"
+        )
