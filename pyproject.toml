@@ -28,4 +28,5 @@ dependencies = [
     "skl2onnx==1.15.0",
     "pyarrow>=22.0.0",
     "optuna>=4.6.0",
+    "gradio>=6.1.0",
 ]
