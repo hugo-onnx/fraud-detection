@@ -5,11 +5,11 @@ import json
 from fastapi.responses import FileResponse
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 
-from app.db import log_request
-from app.config import settings, logger
+from app.db.db import log_request
+from app.config.config import settings, logger
 from app.services.ml_service import model_service
 from app.services.drift_service import drift_service
-from app.schemas import Transaction, DriftReportRequest, PredictionResponse
+from app.models.schemas import Transaction, DriftReportRequest, PredictionResponse
 
 
 router = APIRouter()

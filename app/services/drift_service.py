@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from evidently import Dataset, DataDefinition, Report, BinaryClassification
 from evidently.presets import DataDriftPreset, DataSummaryPreset
 
-from app.config import settings, logger
+from app.config.config import settings, logger
 
 class DriftService:
     def __init__(self):

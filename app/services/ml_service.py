@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import onnxruntime as rt
 from mlflow.tracking import MlflowClient
-from app.config import settings, logger
-from app.db import init_db
+from app.config.config import settings, logger
+from app.db.db import init_db
 
 class ModelService:
     def __init__(self):

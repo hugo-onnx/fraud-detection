@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 
 from app.api.routes import router
 from app.services.ml_service import model_service
-from app.gradio_app import gr_app
+from app.ui.gradio_app import gr_app
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

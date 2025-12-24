@@ -1,7 +1,7 @@
 import sqlite3
 import os
 from datetime import datetime, timezone
-from app.config import settings
+from app.config.config import settings
 
 def init_db(feature_cols: list):
     os.makedirs(os.path.dirname(settings.DB_PATH), exist_ok=True)
