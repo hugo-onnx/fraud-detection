@@ -1,26 +1,35 @@
+import os
 import json
 import joblib
 import mlflow
 import numpy as np
 import pandas as pd
 import onnxruntime as rt
+
 from mlflow.tracking import MlflowClient
 from app.config.config import settings, logger
 from app.db.db import init_db
 
 class ModelService:
     def __init__(self):
-        self.client = MlflowClient(tracking_uri=settings.MLFLOW_TRACKING_URI)
-        mlflow.set_tracking_uri(settings.MLFLOW_TRACKING_URI)
-        
+        self.mlflow_enabled = settings.MLFLOW_ENABLED
+
+        if self.mlflow_enabled:
+            logger.info("MLflow enabled. Initializing MLflow client.")
+            self.client = MlflowClient(tracking_uri=settings.MLFLOW_TRACKING_URI)
+            mlflow.set_tracking_uri(settings.MLFLOW_TRACKING_URI)
+        else:
+            logger.warning("MLflow disabled. Using local model fallback.")
+            self.client = None
+
         # Model State
         self.session = None
         self.scaler = None
         self.feature_columns = []
         self.input_name = None
         self.output_name = None
-        
-        # Metadata for health checks/logging
+
+        # Metadata
         self.model_meta = {
             "name": None,
             "version": None,
@@ -28,21 +37,27 @@ class ModelService:
             "type": None
         }
 
+
     def load_model(self):
         """
-        Main entry point to load the model. 
-        Tries MLflow registry first, falls back to local files if that fails.
+        Main entry point to load the model.
+        Tries MLflow registry first (if enabled), falls back to local files otherwise.
         """
-        try:
-            logger.info("Attempting to load champion model from MLflow registry...")
-            self._load_from_registry()
-            logger.info(f"Successfully loaded {self.model_meta['name']} (v{self.model_meta['version']})")
-        except Exception as e:
-            logger.error(f"Failed to load from registry: {e}")
-            logger.warning("Falling back to local model files...")
+        if self.mlflow_enabled:
+            try:
+                logger.info("Attempting to load champion model from MLflow registry...")
+                self._load_from_registry()
+                logger.info(
+                    f"Successfully loaded {self.model_meta['name']} "
+                    f"(v{self.model_meta['version']})"
+                )
+            except Exception as e:
+                logger.error(f"Failed to load from registry: {e}")
+                logger.warning("Falling back to local model files...")
+                self._load_fallback()
+        else:
             self._load_fallback()
-        
-        # Initialize DB schema based on loaded model features
+
         init_db(self.feature_columns)
 
     def predict(self, features: dict) -> float:
@@ -154,24 +169,30 @@ class ModelService:
         }
 
     def _load_fallback(self):
-        """Loads from local disk if MLflow fails."""
-        # Hardcoded fallback paths
-        local_onnx_path = "models/LightGBM_best.onnx" # Ensure this exists in your project
+        """Loads from local disk if MLflow fails or deactivated."""
+        local_onnx_path = "models/LightGBM_best.onnx"
+
+        if not os.path.exists(local_onnx_path):
+            raise FileNotFoundError(
+                f"Fallback ONNX model not found at {local_onnx_path}"
+            )
         
-        if not self.scaler:
-            self.scaler = joblib.load(settings.SCALER_PATH)
-        
-        if not self.feature_columns:
-            with open(settings.FEATURES_PATH, "r") as f:
-                self.feature_columns = json.load(f)
-                
-        self.session = rt.InferenceSession(local_onnx_path, providers=["CPUExecutionProvider"])
+        self.scaler = joblib.load(settings.SCALER_PATH)
+
+        with open(settings.FEATURES_PATH, "r") as f:
+            self.feature_columns = json.load(f)
+
+        self.session = rt.InferenceSession(
+            local_onnx_path,
+            providers=["CPUExecutionProvider"]
+        )
+
         self._configure_session()
-        
+
         self.model_meta = {
             "name": "Local Fallback",
             "version": "0.0.0",
-            "description": "Loaded from local disk due to registry failure",
+            "description": "Loaded from local disk (Render deployment)",
             "type": "fallback"
         }
 

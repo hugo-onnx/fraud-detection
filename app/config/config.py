@@ -9,9 +9,11 @@ logging.basicConfig(
 logger = logging.getLogger("fraud-api")
 
 class Config:
-    MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI", "http://mlflow:5000")
-    MLFLOW_REGISTRY_URI = os.getenv("MLFLOW_REGISTRY_URI", "http://mlflow:5000")
-    
+    MLFLOW_TRACKING_URI = os.getenv("MLFLOW_TRACKING_URI")
+    MLFLOW_REGISTRY_URI = os.getenv("MLFLOW_REGISTRY_URI")
+
+    MLFLOW_ENABLED = MLFLOW_TRACKING_URI is not None
+
     # Paths
     DB_PATH = "data/production/requests.db"
     REPORT_PATH = "reports/data_drift_report.html"
