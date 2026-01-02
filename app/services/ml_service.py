@@ -76,14 +76,19 @@ class ModelService:
             [self.output_name], {self.input_name: X_scaled}
         )
 
-        pred_val = preds[0][0]
+        pred_val = preds[0]
 
+        # scalar probability
+        if isinstance(pred_val, np.ndarray):
+            return float(pred_val.flatten()[0])
+
+        # dict output
         if isinstance(pred_val, dict):
             return float(pred_val.get(1, 0.0))
-        if isinstance(pred_val, (list, np.ndarray)):
-            return float(pred_val[1])
 
+        # plain float
         return float(pred_val)
+
 
     # MLflow loading
     def _find_champion_model(self):
