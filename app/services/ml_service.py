@@ -23,7 +23,7 @@ class ModelService:
             logger.warning("MLflow disabled. Using local model fallback.")
             self.client = None
 
-        # Model state
+        # Runtime state
         self.session = None
         self.scaler = None
         self.feature_columns = []
@@ -42,30 +42,29 @@ class ModelService:
     def load_model(self):
         """
         Loads model + preprocessors.
-        Tries MLflow (if enabled), otherwise uses local ONNX artifacts.
+        MLflow first (if enabled), otherwise local fallback.
         """
-        if self.mlflow_enabled:
-            try:
-                logger.info("Attempting to load champion model from MLflow registry...")
+        try:
+            if self.mlflow_enabled:
+                logger.info("Attempting MLflow model load...")
                 self._load_from_registry()
-                logger.info(
-                    f"Loaded {self.model_meta['name']} "
-                    f"(v{self.model_meta['version']})"
-                )
-            except Exception as e:
-                logger.exception("MLflow load failed. Falling back to local model.")
+            else:
                 self._load_fallback()
-        else:
+        except Exception:
+            logger.exception("Model load failed. Falling back to local artifacts.")
             self._load_fallback()
 
-        # Initialize DB schema using feature list
+        # DB init only after features are loaded
+        if not self.feature_columns:
+            raise RuntimeError("Feature columns list is empty — cannot initialize DB")
+
         init_db(self.feature_columns)
+        logger.info("Model, preprocessors and DB initialized successfully")
 
     def predict(self, features: dict) -> float:
         if not self.session:
-            raise RuntimeError("Model is not loaded.")
+            raise RuntimeError("Model is not loaded")
 
-        # Validate inputs
         missing = [c for c in self.feature_columns if c not in features]
         if missing:
             raise ValueError(f"Missing required features: {missing}")
@@ -97,7 +96,7 @@ class ModelService:
             except Exception:
                 continue
 
-        raise RuntimeError("No champion model found in MLflow registry.")
+        raise RuntimeError("No champion model found in MLflow registry")
 
     def _load_from_registry(self):
         model_name, model_version, model_key = self._find_champion_model()
@@ -114,15 +113,17 @@ class ModelService:
         else:
             model_type = model_key.title()
 
-        onnx_rel_path = f"{model_type}/onnx/{model_type}_best.onnx"
+        # ONNX model
+        onnx_rel = f"{model_type}/onnx/{model_type}_best.onnx"
         local_onnx = mlflow.artifacts.download_artifacts(
-            f"{artifact_uri}/{onnx_rel_path}"
+            f"{artifact_uri}/{onnx_rel}"
         )
 
         self.session = rt.InferenceSession(
             local_onnx, providers=["CPUExecutionProvider"]
         )
 
+        # Preprocessors
         try:
             scaler_path = mlflow.artifacts.download_artifacts(
                 f"{artifact_uri}/scaler.pkl"
@@ -134,7 +135,7 @@ class ModelService:
             with open(features_path) as f:
                 self.feature_columns = json.load(f)
         except Exception:
-            logger.warning("Preprocessors missing in MLflow. Using local files.")
+            logger.warning("MLflow preprocessors missing — using local files")
             self._load_local_preprocessors()
 
         self._configure_session()
@@ -148,36 +149,42 @@ class ModelService:
 
     # Local fallback (Render-safe)
     def _load_fallback(self):
-        logger.error("========== MODEL DEBUG ==========")
-        logger.error(f"CWD: {os.getcwd()}")
-        logger.error(f"BASE_DIR: {settings.MODELS_DIR.parent}")
-        logger.error(f"MODELS_DIR: {settings.MODELS_DIR}")
-        logger.error("Listing /app:")
-        try:
-            logger.error(os.listdir("/app"))
-        except Exception as e:
-            logger.error(f"Cannot list /app: {e}")
+        logger.warning("Using local model fallback")
 
-        logger.error("Listing MODELS_DIR:")
-        try:
-            logger.error(os.listdir(settings.MODELS_DIR))
-        except Exception as e:
-            logger.error(f"Cannot list MODELS_DIR: {e}")
-
-        onnx_path = settings.MODELS_DIR / "LightGBM_best.onnx"
-        logger.error(f"Expecting ONNX at: {onnx_path}")
-        logger.error(f"Exists? {onnx_path.exists()}")
-        logger.error("=================================")
+        models_dir = settings.MODELS_DIR
+        onnx_path = models_dir / "LightGBM_best.onnx"
 
         if not onnx_path.exists():
-            raise FileNotFoundError(
-                f"Local ONNX model not found at {onnx_path}"
-            )
+            raise FileNotFoundError(f"Local ONNX model not found at {onnx_path}")
+
+        # Load preprocessors frist
+        self._load_local_preprocessors()
+
+        # Load ONNX
+        self.session = rt.InferenceSession(
+            str(onnx_path),
+            providers=["CPUExecutionProvider"]
+        )
+
+        self._configure_session()
+
+        self.model_meta = {
+            "name": "Local LightGBM",
+            "version": "0.0.0",
+            "description": "Local ONNX fallback (container)",
+            "type": "fallback",
+        }
 
     def _load_local_preprocessors(self):
+        logger.info("Loading local preprocessors")
+
         self.scaler = joblib.load(settings.SCALER_PATH)
+
         with open(settings.FEATURES_PATH) as f:
             self.feature_columns = json.load(f)
+
+        if not self.feature_columns:
+            raise RuntimeError("Loaded feature_columns.json is empty")
 
     # ONNX helpers
     def _configure_session(self):
