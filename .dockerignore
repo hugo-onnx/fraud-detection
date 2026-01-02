@@ -18,10 +18,6 @@ __pycache__/
 data/
 results/
 
-
-# Model training artifacts
-models/
-
 # Logs and temporary files
 logs/
 *.log
