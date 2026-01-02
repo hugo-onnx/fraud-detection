@@ -1,3 +1,4 @@
+import os
 import json
 import joblib
 import mlflow
@@ -147,28 +148,31 @@ class ModelService:
 
     # Local fallback (Render-safe)
     def _load_fallback(self):
+        logger.error("========== MODEL DEBUG ==========")
+        logger.error(f"CWD: {os.getcwd()}")
+        logger.error(f"BASE_DIR: {settings.MODELS_DIR.parent}")
+        logger.error(f"MODELS_DIR: {settings.MODELS_DIR}")
+        logger.error("Listing /app:")
+        try:
+            logger.error(os.listdir("/app"))
+        except Exception as e:
+            logger.error(f"Cannot list /app: {e}")
+
+        logger.error("Listing MODELS_DIR:")
+        try:
+            logger.error(os.listdir(settings.MODELS_DIR))
+        except Exception as e:
+            logger.error(f"Cannot list MODELS_DIR: {e}")
+
         onnx_path = settings.MODELS_DIR / "LightGBM_best.onnx"
+        logger.error(f"Expecting ONNX at: {onnx_path}")
+        logger.error(f"Exists? {onnx_path.exists()}")
+        logger.error("=================================")
 
         if not onnx_path.exists():
             raise FileNotFoundError(
                 f"Local ONNX model not found at {onnx_path}"
             )
-
-        logger.info(f"Loading local ONNX model from {onnx_path}")
-
-        self.session = rt.InferenceSession(
-            str(onnx_path), providers=["CPUExecutionProvider"]
-        )
-
-        self._load_local_preprocessors()
-        self._configure_session()
-
-        self.model_meta = {
-            "name": "Local LightGBM",
-            "version": "local",
-            "description": "Bundled ONNX model (Render)",
-            "type": "fallback",
-        }
 
     def _load_local_preprocessors(self):
         self.scaler = joblib.load(settings.SCALER_PATH)
