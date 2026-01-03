@@ -69,26 +69,46 @@ class ModelService:
         if missing:
             raise ValueError(f"Missing required features: {missing}")
 
+        # Build input
         X_df = pd.DataFrame([features], columns=self.feature_columns)
         X_scaled = self.scaler.transform(X_df).astype(np.float32)
 
-        preds = self.session.run(
-            [self.output_name], {self.input_name: X_scaled}
+        # Run ONNX
+        outputs = self.session.run(
+            [self.output_name],
+            {self.input_name: X_scaled}
         )
 
-        pred_val = preds[0]
+        logger.debug(f"RAW ONNX OUTPUT: {outputs}")
 
-        # scalar probability
-        if isinstance(pred_val, np.ndarray):
-            return float(pred_val.flatten()[0])
+        output = outputs[0]
 
-        # dict output
-        if isinstance(pred_val, dict):
-            return float(pred_val.get(1, 0.0))
+        # Normalize output to scalar fraud probability
+        # ndarray
+        if isinstance(output, np.ndarray):
+            arr = output.squeeze()
 
-        # plain float
-        return float(pred_val)
+            # Binary classifier
+            if arr.ndim == 1 and arr.size == 2:
+                return float(arr[1])
 
+            # Single probability
+            if arr.ndim == 0:
+                return float(arr)
+
+            # [[p0, p1]] or [[p]]
+            return float(arr.flatten()[-1])
+
+        # list
+        if isinstance(output, list):
+            return float(np.array(output).flatten()[-1])
+
+        # dict
+        if isinstance(output, dict):
+            return float(output.get(1, output.get("probability", 0.0)))
+
+        # already scalar
+        return float(output)
 
     # MLflow loading
     def _find_champion_model(self):
