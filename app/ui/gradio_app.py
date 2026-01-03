@@ -53,22 +53,29 @@ def predict_generator(*args):
 
     try:
         start = time.time()
-        data = model_service.predict(features)
+        result = model_service.predict(features)
         latency = time.time() - start
 
-        prob = safe_format_probability(data.get("fraud_probability"))
-        version = data.get("model_version", "unknown")
+        # ✅ FIX: model_service.predict returns a float
+        if isinstance(result, dict):
+            prob_value = result.get("fraud_probability")
+            version = result.get("model_version", "unknown")
+        else:
+            prob_value = result
+            version = model_service.model_meta.get("version", "local")
+
+        prob = safe_format_probability(prob_value)
 
         risk_label = ""
         try:
-            p = float(prob)
+            p = float(prob_value)
             if p >= 0.7:
                 risk_label = "🔴 High risk"
             elif p >= 0.4:
                 risk_label = "🟠 Medium risk"
             else:
                 risk_label = "🟢 Low risk"
-        except:
+        except Exception:
             pass
 
         md = f"""
@@ -84,13 +91,11 @@ def predict_generator(*args):
     except Exception as e:
         yield f"❌ Prediction error: {e}"
 
-
 custom_theme = gr.themes.Soft().set(
-    button_primary_background_fill_hover='*primary_600',
+    button_primary_background_fill_hover="*primary_600",
 )
 
-with gr.Blocks(title="Fraud Detection Service Demo") as demo:
-
+with gr.Blocks(title="Fraud Detection Service Demo", theme=custom_theme) as demo:
     gr.Markdown("<h2 style='text-align:center;'>Fraud Prediction Service</h2>")
 
     with gr.Row():
@@ -102,29 +107,22 @@ with gr.Blocks(title="Fraud Detection Service Demo") as demo:
                     predict_btn = gr.Button("🚀 Predict", variant="primary")
                     random_btn = gr.Button("🎲 Random")
                     reset_btn = gr.Button("🔄 Reset")
-                deterministic_checkbox = gr.Checkbox(label="Deterministic Random (seed=42)", value=False)
+
+                deterministic_checkbox = gr.Checkbox(
+                    label="Deterministic Random (seed=42)", value=False
+                )
 
                 feature_inputs = []
 
                 with gr.Row():
                     with gr.Column():
                         for col in NUMERICAL_COLUMNS[:15]:
-                            if col == "Time":
-                                comp = gr.Number(label=col, value=1000.0, minimum=0)
-                            elif col == "Amount":
-                                comp = gr.Number(label=col, value=50.0, minimum=0.0, step=0.01)
-                            else:
-                                comp = gr.Number(label=col, value=0.0, step=0.0001)
+                            comp = gr.Number(label=col, value=get_default_value(col))
                             feature_inputs.append(comp)
 
                     with gr.Column():
                         for col in NUMERICAL_COLUMNS[15:]:
-                            if col == "Time":
-                                comp = gr.Number(label=col, value=1000.0, minimum=0)
-                            elif col == "Amount":
-                                comp = gr.Number(label=col, value=50.0, minimum=0.0, step=0.01)
-                            else:
-                                comp = gr.Number(label=col, value=0.0, step=0.0001)
+                            comp = gr.Number(label=col, value=get_default_value(col))
                             feature_inputs.append(comp)
 
         with gr.Column(scale=1):
@@ -136,21 +134,21 @@ with gr.Blocks(title="Fraud Detection Service Demo") as demo:
         fn=generate_random_request_inputs,
         inputs=[deterministic_checkbox],
         outputs=feature_inputs,
-        queue=False
+        queue=False,
     )
 
     reset_btn.click(
         fn=reset_inputs,
         inputs=None,
         outputs=feature_inputs,
-        queue=False
+        queue=False,
     )
 
     predict_btn.click(
         fn=predict_generator,
         inputs=feature_inputs,
         outputs=output_md,
-        queue=True
+        queue=True,
     )
 
 gr_app = demo
