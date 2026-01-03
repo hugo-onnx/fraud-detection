@@ -69,11 +69,9 @@ class ModelService:
         if missing:
             raise ValueError(f"Missing required features: {missing}")
 
-        # Build input
         X_df = pd.DataFrame([features], columns=self.feature_columns)
         X_scaled = self.scaler.transform(X_df).astype(np.float32)
 
-        # Run ONNX
         outputs = self.session.run(
             [self.output_name],
             {self.input_name: X_scaled}
@@ -83,32 +81,54 @@ class ModelService:
 
         output = outputs[0]
 
-        # Normalize output to scalar fraud probability
-        # ndarray
+        # ---------- NORMALIZATION PIPELINE ----------
+
+        # 1. Dict → take fraud class (1)
+        if isinstance(output, dict):
+            if 1 in output:
+                return float(output[1])
+            if "probabilities" in output:
+                return float(output["probabilities"][-1])
+            # fallback: max prob
+            return float(max(output.values()))
+
+        # 2. NumPy array
         if isinstance(output, np.ndarray):
             arr = output.squeeze()
 
-            # Binary classifier
-            if arr.ndim == 1 and arr.size == 2:
-                return float(arr[1])
+            # Binary classifier → [p0, p1]
+            if arr.ndim == 1 and arr.size >= 2:
+                return float(arr[-1])
 
-            # Single probability
+            # Scalar
             if arr.ndim == 0:
                 return float(arr)
 
-            # [[p0, p1]] or [[p]]
             return float(arr.flatten()[-1])
 
-        # list
+        # 3. List (wrap numpy or dict)
         if isinstance(output, list):
-            return float(np.array(output).flatten()[-1])
+            return self._normalize_list_output(output)
 
-        # dict
-        if isinstance(output, dict):
-            return float(output.get(1, output.get("probability", 0.0)))
-
-        # already scalar
+        # 4. Scalar
         return float(output)
+
+
+def _normalize_list_output(self, output):
+    # unwrap list recursively
+    while isinstance(output, list) and len(output) == 1:
+        output = output[0]
+
+    if isinstance(output, dict):
+        if 1 in output:
+            return float(output[1])
+        return float(max(output.values()))
+
+    if isinstance(output, np.ndarray):
+        return float(output.flatten()[-1])
+
+    return float(output)
+
 
     # MLflow loading
     def _find_champion_model(self):
