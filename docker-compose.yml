@@ -12,6 +12,7 @@ services:
       mlflow:
         condition: service_healthy
     environment:
+      DB_PATH: /app/data/requests.db
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MLFLOW_REGISTRY_URI: http://mlflow:5000
       AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
