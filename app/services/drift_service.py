@@ -19,7 +19,7 @@ class DriftService:
             classification=[
                 BinaryClassification(
                     target="Class",
-                    prediction_probas="fraud_probability", # Column name expected in data for this metric
+                    prediction_probas="fraud_probability",
                 )
             ],
             # List of all feature columns (V1-V28, Time, Amount)
@@ -42,7 +42,6 @@ class DriftService:
         reference = pd.read_csv(settings.REFERENCE_CSV)
         
         # Add a placeholder for fraud_probability (required by BinaryClassification metric)
-        # Even though we don't have predictions on ref data, Evidently needs this column.
         reference["fraud_probability"] = np.nan
         
         return reference
@@ -77,7 +76,7 @@ class DriftService:
         return current
     
     def generate_report(self, days: int):
-        """Generates the data drift report."""
+        """Generates a data drift report comparing production data against the reference dataset."""
         start_time = time.time()
         
         reference = self._load_reference_data()
@@ -99,21 +98,27 @@ class DriftService:
         # Report with summary + drift
         report = Report(
             metrics=[
-                # Drift threshold set to 70% of columns showing drift
-                DataDriftPreset(drift_share=0.7), 
+                DataDriftPreset(drift_share=0.7),
                 DataSummaryPreset()
             ],
-            include_tests=True # Optionally include tests for a more comprehensive report
+            include_tests=True
         )
         
         # Run monitoring
         logger.info("Running drift analysis...")
         report_results = report.run(reference_data=reference_data, current_data=current_data)
         
-        # Save reports
+        # Ensure reports directory exists
         os.makedirs(os.path.dirname(settings.REPORT_PATH), exist_ok=True)
-        report_results.save_html(settings.REPORT_PATH)
-        report_results.save_json(settings.REPORT_JSON)
+        
+        # Convert Path objects to strings for Evidently compatibility
+        report_path_str = str(settings.REPORT_PATH)
+        report_json_str = str(settings.REPORT_JSON)
+        
+        # Save reports
+        logger.info(f"Saving drift report to: {report_path_str}")
+        report_results.save_html(report_path_str)
+        report_results.save_json(report_json_str)
         
         elapsed = time.time() - start_time
         
