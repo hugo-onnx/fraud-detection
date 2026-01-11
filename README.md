@@ -2,10 +2,14 @@
 
 A production-ready machine learning operations (MLOps) platform for real-time credit card fraud detection, demonstrating end-to-end ML engineering best practices from experimentation to deployment.
 
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-green.svg)](https://fastapi.tiangolo.com)
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com)
 [![MLflow](https://img.shields.io/badge/MLflow-2.18+-orange.svg)](https://mlflow.org)
-[![Docker](https://img.shields.io/badge/Docker-ready-blue.svg)](https://www.docker.com/)
+[![ONNX Runtime](https://img.shields.io/badge/ONNX-Runtime-purple.svg)](https://onnxruntime.ai)
+[![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://www.postgresql.org/)
+[![MinIO](https://img.shields.io/badge/MinIO-S3--Compatible-red.svg)](https://min.io/)
+[![Evidently AI](https://img.shields.io/badge/Evidently-Drift%20Detection-yellow.svg)](https://www.evidentlyai.com/)
 
 ## 🎯 Project Overview
 
@@ -97,7 +101,7 @@ The training pipeline is fully automated and designed for reproducibility, movin
 
 ### 1. Data Preprocessing
 ```bash
-python src/data_preprocessing.py
+uv run src/data_preprocessing.py
 ```
 - Loads credit card transaction data
 - Performs train/test split with stratification
@@ -107,7 +111,7 @@ python src/data_preprocessing.py
 
 ### 2. Hyperparameter Optimization
 ```bash
-python src/hpo.py
+uv run src/hpo.py
 ```
 - Uses Optuna for Bayesian optimization
 - Compares multiple algorithms: Logistic Regression, Random Forest, LightGBM
@@ -116,7 +120,7 @@ python src/hpo.py
 
 ### 3. Model Training & Registration
 ```bash
-python src/train.py
+uv run src/train.py
 ```
 - Trains champion models with optimized hyperparameters
 - Converts models to ONNX format for production deployment
@@ -326,4 +330,4 @@ mlops-fraud-detection-service/
 - Reference data management for drift detection
 
 > ⚠️ Note  
-> Some components (e.g., SQLite logging, batch API design) are intentionally simplified to keep the project self-contained, while preserving production-relevant architecture and patterns.
+> Some components (e.g., batch API design, docker-compose) are intentionally simplified to keep the project self-contained, while preserving production-relevant architecture and patterns.
