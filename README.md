@@ -22,60 +22,32 @@ This project showcases a complete MLOps pipeline including data preprocessing, h
 
 ## 🏗️ Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Fraud Detection Service                   │
-├─────────────────────────────────────────────────────────────┤
-│  FastAPI REST API          │  Gradio Web UI                 │
-│  • /predict (single)       │  • Interactive prediction      │
-│  • /predict/batch          │  • Real-time visualization     │
-│  • /monitoring/drift       │                                │
-│  • /health                 │                                │
-└──────────────┬──────────────────────────────┬───────────────┘
-               │                              │
-               ▼                              ▼
-    ┌──────────────────┐          ┌──────────────────┐
-    │  ONNX Runtime    │          │  SQLite Logger   │
-    │  (ML Inference)  │          │  (Predictions)   │
-    └──────────────────┘          └──────────────────┘
-               │                              │
-               ▼                              ▼
-    ┌──────────────────┐          ┌──────────────────┐
-    │  MLflow Registry │          │ Evidently Drift  │
-    │  (Model Store)   │          │  Detection       │
-    └──────────────────┘          └──────────────────┘
-               │
-               ▼
-    ┌──────────────────────────────────────┐
-    │  Infrastructure (Docker Compose)      │
-    │  • PostgreSQL (MLflow backend)       │
-    │  • MinIO (S3-compatible artifacts)   │
-    │  • MLflow Server                     │
-    └──────────────────────────────────────┘
-```
+The system is designed as a microservices architecture orchestrated by **Docker Compose**, separating the API logic, experiment tracking, and data persistence.
+
+![System Architecture](/images/system-architecture.png)
+
+### Component Breakdown:
+* **fraud-api container**: Houses the FastAPI application, Gradio UI, and the **ONNX Runtime** for high-performance inference.
+* **mlflow container**: Manages the Model Registry and experiment logs, allowing the API to dynamically pull the "champion" model.
+* **postgres container**: Acts as the backend store for MLflow metadata and request logging.
+* **Evidently AI**: Integrated within the private API routes to monitor data drift and model health.
 
 ## 🛠️ Tech Stack
 
-**Machine Learning & MLOps:**
-- **Frameworks**: scikit-learn, LightGBM, XGBoost
-- **Optimization**: Optuna (hyperparameter tuning)
-- **Inference**: ONNX Runtime (framework-agnostic deployment)
-- **Experiment Tracking**: MLflow (with model registry)
-- **Monitoring**: Evidently (drift detection)
-
-**Backend & API:**
-- **Web Framework**: FastAPI (async REST API)
-- **UI**: Gradio (interactive web interface)
-- **Database**: SQLite (production logging), PostgreSQL (MLflow backend)
-- **Object Storage**: MinIO (S3-compatible artifact store)
-
-**DevOps & Deployment:**
-- **Containerization**: Docker & Docker Compose
-- **Dependency Management**: uv (fast Python package manager)
-- **Data Processing**: Pandas, Polars
-- **Environment**: Python 3.11+
+| Category | Tools |
+| :--- | :--- |
+| **ML Frameworks** | scikit-learn, LightGBM, XGBoost, SHAP |
+| **MLOps & Tracking** | MLflow, Optuna, ONNX Runtime |
+| **Monitoring** | Evidently AI |
+| **Backend** | FastAPI, Gradio (UI), Pydantic |
+| **Infrastructure** | Docker, Docker Compose, MinIO (S3), PostgreSQL, SQLite |
+| **Data Handling** | Pandas, Polars, Parquet |
 
 ## 📊 ML Pipeline
+
+The training pipeline is fully automated and designed for reproducibility, moving from raw data in S3-compatible storage to a versioned, production-ready ONNX model.
+
+![Training Pipeline](/images/training-pipeline.png)
 
 ### 1. Data Preprocessing
 ```bash
