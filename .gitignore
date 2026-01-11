@@ -209,6 +209,7 @@ __marimo__/
 
 # Other
 .DS_Store
-*.db
+optuna.db
 *.txt
 scripts/
+data/
