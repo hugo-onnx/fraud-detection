@@ -11,14 +11,45 @@ A production-ready machine learning operations (MLOps) platform for real-time cr
 
 This project showcases a complete MLOps pipeline including data preprocessing, hyperparameter optimization, model training, deployment, monitoring, and drift detection. The service exposes a REST API and interactive UI for fraud prediction while maintaining full experiment tracking and model versioning.
 
+## 🌐 Live Demo
+
+You can explore the deployed application here:
+
+- **Interactive UI (Gradio)**  
+  👉 https://fraud-detection-api-5gq2.onrender.com/ui
+
+- **API Documentation (Swagger / OpenAPI)**  
+  👉 https://fraud-detection-api-5gq2.onrender.com/docs
+
+> ⚠️ **Deployment Notice**  
+> This service is deployed on **Render’s free tier**.  
+> The first request may take **30–60 seconds** to respond due to cold starts.  
+> Subsequent requests will be significantly faster.
+
+
+## 💡 Problem & Motivation
+
+Credit card fraud detection systems face three key production challenges:
+1. **Extreme class imbalance** requiring careful evaluation and monitoring
+2. **Model decay over time** due to changing transaction patterns
+3. **Operational complexity** when moving from notebooks to production APIs
+
+This project was designed to simulate a **real-world fraud detection system**, focusing not just on model accuracy, but on:
+- Reliable deployment
+- Continuous monitoring
+- Reproducibility
+- Operational robustness
+
+The goal is to demonstrate how an ML system behaves *after* deployment — not just how it trains.
+
 **Key Highlights:**
-- 🚀 **Production-Ready API**: FastAPI service with ONNX-optimized inference
-- 📊 **Interactive UI**: Gradio interface for real-time predictions
-- 🔬 **Experiment Tracking**: MLflow integration with model registry
-- 📈 **Model Monitoring**: Automated data drift detection with Evidently
-- 🐳 **Containerized**: Docker Compose orchestration for easy deployment
-- ⚡ **Optimized Performance**: ONNX runtime for faster inference
-- 🎛️ **Hyperparameter Tuning**: Optuna-based automated optimization
+- 🚀 FastAPI inference service with ONNX-optimized models
+- 🔬 Full experiment tracking & model registry (MLflow)
+- 📈 Automated data drift detection (Evidently)
+- 🎛️ Hyperparameter optimization (Optuna)
+- 🐳 Fully containerized, reproducible setup
+- 🧪 Production-grade logging, monitoring, and fallbacks
+
 
 ## 🏗️ Architecture
 
@@ -32,16 +63,33 @@ The system is designed as a microservices architecture orchestrated by **Docker 
 * **postgres container**: Acts as the backend store for MLflow metadata and request logging.
 * **Evidently AI**: Integrated within the private API routes to monitor data drift and model health.
 
+## 🧠 Key Design Decisions
+
+- **ONNX for inference**  
+  Chosen to decouple training frameworks from production serving and improve latency consistency.
+
+- **MLflow Model Registry with aliases**  
+  Enables safe model promotion (champion/challenger) without redeploying the API.
+
+- **Evidently for drift detection**  
+  Focused on *data drift* rather than concept drift, as labels may not be immediately available in fraud systems.
+
+- **Parquet for intermediate artifacts**  
+  Optimizes I/O performance and schema consistency across training stages.
+
+- **Docker Compose over Kubernetes**  
+  Keeps the project locally reproducible while mirroring real microservice separation.
+
 ## 🛠️ Tech Stack
 
 | Category | Tools |
 | :--- | :--- |
-| **ML Frameworks** | scikit-learn, LightGBM, XGBoost, SHAP |
+| **ML Frameworks** | scikit-learn, LightGBM, SHAP |
 | **MLOps & Tracking** | MLflow, Optuna, ONNX Runtime |
 | **Monitoring** | Evidently AI |
 | **Backend** | FastAPI, Gradio (UI), Pydantic |
-| **Infrastructure** | Docker, Docker Compose, MinIO (S3), PostgreSQL, SQLite |
-| **Data Handling** | Pandas, Polars, Parquet |
+| **Infrastructure** | Docker, Docker Compose, MinIO (S3), PostgreSQL |
+| **Data Handling** | Pandas, Parquet |
 
 ## 📊 ML Pipeline
 
@@ -87,6 +135,10 @@ mlflow models set-alias --name fraud_detection_lightgbm --alias champion --versi
 
 ## 🚀 Quick Start
 
+> 💡 Tip  
+> If you just want to explore the system behavior without running it locally,  
+> you can use the live deployment listed in the **Live Demo** section above.
+
 ### Prerequisites
 - Python 3.11+
 - Docker & Docker Compose
@@ -111,15 +163,9 @@ cp .env.example .env
 # Edit .env with your configuration
 ```
 
-4. **Prepare data**
+4. **Start services**
 ```bash
-# Place creditcard.csv in data/raw/
-python src/data_preprocessing.py
-```
-
-5. **Start services**
-```bash
-docker-compose up -d
+docker-compose up -d --build
 ```
 
 ### Access Points
@@ -193,6 +239,8 @@ curl -X POST "http://localhost:8000/monitoring/drift" \
 
 ## 📈 Model Performance
 
+Metrics prioritize recall and AUC due to the asymmetric cost of false negatives in fraud detection.
+
 | Model | AUC-ROC | Precision | Recall | F1-Score |
 |-------|---------|-----------|--------|----------|
 | LightGBM | 0.98 | 0.92 | 0.89 | 0.90 |
@@ -206,14 +254,14 @@ curl -X POST "http://localhost:8000/monitoring/drift" \
 ### Training New Models
 ```bash
 # Run full pipeline
-python src/data_preprocessing.py
-python src/hpo.py
-python src/train.py
+uv run src/data_preprocessing.py
+uv run src/hpo.py
+uv run src/train.py
 ```
 
 ### Local API Development
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+docker-compose up -d --build
 ```
 
 ### View Logs
@@ -279,13 +327,5 @@ mlops-fraud-detection-service/
 - Production data logging and monitoring
 - Reference data management for drift detection
 
-## 🔮 Future Enhancements
-
-- [ ] Kubernetes deployment with Helm charts
-- [ ] CI/CD pipeline with GitHub Actions
-- [ ] Prometheus metrics and Grafana dashboards
-- [ ] Feature store integration (Feast)
-- [ ] A/B testing framework
-- [ ] Automated model retraining pipeline
-- [ ] Multi-model ensemble predictions
-- [ ] Real-time streaming with Kafka/Kinesis
+> ⚠️ Note  
+> Some components (e.g., SQLite logging, batch API design) are intentionally simplified to keep the project self-contained, while preserving production-relevant architecture and patterns.
