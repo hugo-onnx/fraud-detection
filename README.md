@@ -11,6 +11,14 @@ A production-ready machine learning operations (MLOps) platform for real-time cr
 
 This project showcases a complete MLOps pipeline including data preprocessing, hyperparameter optimization, model training, deployment, monitoring, and drift detection. The service exposes a REST API and interactive UI for fraud prediction while maintaining full experiment tracking and model versioning.
 
+**Key Highlights:**
+- 🚀 FastAPI inference service with ONNX-optimized models
+- 🔬 Full experiment tracking & model registry (MLflow)
+- 📈 Automated data drift detection (Evidently)
+- 🎛️ Hyperparameter optimization (Optuna)
+- 🐳 Fully containerized, reproducible setup
+- 🧪 Production-grade logging, monitoring, and fallbacks
+
 ## 🌐 Live Demo
 
 You can explore the deployed application here:
@@ -26,7 +34,6 @@ You can explore the deployed application here:
 > The first request may take **30–60 seconds** to respond due to cold starts.  
 > Subsequent requests will be significantly faster.
 
-
 ## 💡 Problem & Motivation
 
 Credit card fraud detection systems face three key production challenges:
@@ -41,15 +48,6 @@ This project was designed to simulate a **real-world fraud detection system**, f
 - Operational robustness
 
 The goal is to demonstrate how an ML system behaves *after* deployment — not just how it trains.
-
-**Key Highlights:**
-- 🚀 FastAPI inference service with ONNX-optimized models
-- 🔬 Full experiment tracking & model registry (MLflow)
-- 📈 Automated data drift detection (Evidently)
-- 🎛️ Hyperparameter optimization (Optuna)
-- 🐳 Fully containerized, reproducible setup
-- 🧪 Production-grade logging, monitoring, and fallbacks
-
 
 ## 🏗️ Architecture
 
